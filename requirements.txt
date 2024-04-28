@@ -1,0 +1,6 @@
+python-dotenv
+openai
+requests
+streamlit
+scikit-learn
+
