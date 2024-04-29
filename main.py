@@ -197,12 +197,22 @@ def load_and_predict(uploaded_file):
     imputed_data = imputer.fit_transform(df)
     
     # Create a DataFrame with the imputed data
-    df = pd.DataFrame(imputed_data, columns=df.columns)
+    df_imputed = pd.DataFrame(imputed_data, columns=df.columns)
 
     # Load model and predict
     model = pickle.load(open("insurance_random_forest_model_1.pkl", "rb"))
-    predictions = model.predict(df)
-    return predictions
+    predictions = model.predict(df_imputed)
+
+    # Convert predictions from 0,1 to 'No', 'Yes'
+    predictions_mapped = ['Yes' if pred == 1 else 'No' for pred in predictions]
+   
+
+    # Append mapped predictions to the original DataFrame
+    df['Predictions'] = predictions_mapped
+    print("DataFrame with predictions appended:")
+    print(df.head())  # Display first few rows to confirm predictions are appended
+    return df
+   
 
 
 def upload_file(uploaded_file):
@@ -282,17 +292,16 @@ def main():
         manager.uploaded_file = uploaded_file 
         insights = manager.analyze_file()
         st.write(insights)
-        # Process the predictions
-        predictions = load_and_predict(uploaded_file)
+        # Process the predictions and get the updated DataFrame
+        updated_df = load_and_predict(uploaded_file)
 
-        # Convert predictions to a DataFrame and then to CSV for download
-        predictions_df = pd.DataFrame(predictions, columns=['Predictions'])
-        predictions_csv = predictions_df.to_csv(index=False).encode('utf-8')
+    # Convert the updated DataFrame (with original data and predictions) to CSV for download
+        updated_csv = updated_df.to_csv(index=False).encode('utf-8')
         
         # Use Streamlit to download the result as a CSV file
         st.download_button(
             label="Download Predictions as CSV",
-            data=predictions_csv,
+            data=updated_csv,
             file_name='predictions.csv',
             mime='text/csv',
         )
@@ -304,7 +313,7 @@ def main():
         file_id = upload_file(uploaded_file)  # Use modified upload function
 
         # Assuming you want to add the predictions as a message to the thread
-        prediction_output = ", ".join(map(str, predictions))
+        #prediction_output = ", ".join(map(str, predictions))
         #manager.add_message_to_thread(thread_id, "user", f"Predictions: {prediction_output}")
         
        
