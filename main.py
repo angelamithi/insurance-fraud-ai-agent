@@ -243,7 +243,7 @@ def create_text_summary(df):
     summary_text = "\n".join(summary_lines)
     return summary_text
 
-def main():
+def main_page():
     st.title("Fraud Prediction System")
     # Initialize the assistant and thread if not already set
     if 'assistant_id' not in st.session_state or 'thread_id' not in st.session_state:
@@ -320,7 +320,77 @@ def main():
         
     #     # run_id = manager.run_assistant(thread_id, assistant_id)
     #     # st.write(f"Run ID: {run_id}")
+def load_and_analyse_predicted_file(uploaded_file):
+    try:
+        df = pd.read_csv(uploaded_file)
+        return create_text_summary_predicted_file(df)
+    except pd.errors.EmptyDataError:
+        return "The uploaded CSV file is empty or improperly formatted."
 
+def create_text_summary_predicted_file(df):
+    summary_lines = []
+    for index, row in df.iterrows():
+        line = f"Record {index+1}: " + ", ".join([f"{col}={val}" for col, val in row.items() if pd.notna(val)])
+        summary_lines.append(line)
+    return "\n".join(summary_lines)
+
+def file_analysis_page():
+    st.subheader("File Upload for Analysis")
+    if 'assistant_id' not in st.session_state or 'thread_id' not in st.session_state:
+        st.session_state.assistant_id = None
+        st.session_state.thread_id = None
+    manager = AssistantManager()
+    if not st.session_state.assistant_id:
+        assistant_id = manager.create_assistant()
+        st.session_state.assistant_id = assistant_id
+    if not st.session_state.thread_id:
+        manager.create_thread()
+        st.session_state.thread_id = manager.thread.id
+
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+
+    # Display existing conversation messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+     # User input through chat interface
+    user_input = st.chat_input("How can I assist you with your today?")
+    if user_input:
+        # Append user input to the session state messages
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        # Immediately display user input
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        # Add message to thread and handle the input
+        manager.add_message_to_thread(role="user", content=user_input)
+        # manager.add_message_to_thread("user", f"Predictions: {prediction_output}")
+        manager.run_assistant(instructions="Handle the user's input")
+        manager.wait_for_completion()
+
+        # Get and display the summary response from the assistant
+        recommendations = manager.get_summary()
+        st.session_state.messages.append({"role": "assistant", "content": recommendations})
+        with st.chat_message("assistant"):
+            st.markdown(recommendations)
+
+    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+    if uploaded_file is not None:
+         
+        
+        manager.uploaded_file = uploaded_file 
+        insights = manager.analyze_file()
+        st.write(insights)
+
+def main():
+    st.sidebar.title("Navigation")
+    app_mode = st.sidebar.radio("Choose a mode", ["Main Application", "File Analysis"])
+    
+    if app_mode == "File Analysis":
+        file_analysis_page()
+    else:
+        main_page()
 
 
 if __name__ == "__main__":
