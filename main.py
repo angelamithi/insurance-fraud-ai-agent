@@ -8,6 +8,9 @@ import streamlit as st
 from dotenv import load_dotenv
 import json
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 # Load environment variables
 load_dotenv()
@@ -173,7 +176,10 @@ class AssistantManager:
 
     
 
-
+# Utility function to be included or imported
+def drop_columns(X):
+    columns_to_drop = ['policy_number', 'policy_bind_date', 'insured_zip', 'incident_location', 'incident_date']
+    return X.drop(columns=columns_to_drop, errors='ignore')
 
 def load_and_predict(uploaded_file):
     # Ensure the file pointer is at the beginning
@@ -185,34 +191,29 @@ def load_and_predict(uploaded_file):
     except pd.errors.EmptyDataError:
         return "The uploaded CSV file is empty or improperly formatted."
 
-    # Drop the columns that are not used by the model
-    columns_to_drop = ['policy_number', 'policy_bind_date', 'insured_zip', 'incident_location', 'incident_date']
-    df.drop(columns=columns_to_drop, errors='ignore', inplace=True)
-
-    # Convert all columns to numeric, handling errors by coercing to NaN
-    df = df.apply(pd.to_numeric, errors='coerce')
-
-    # Impute NaN values using a constant strategy
-    imputer = SimpleImputer(strategy='constant', fill_value=0)
-    imputed_data = imputer.fit_transform(df)
+   
     
-    # Create a DataFrame with the imputed data
-    df_imputed = pd.DataFrame(imputed_data, columns=df.columns)
-
-    # Load model and predict
-    model = pickle.load(open("insurance_random_forest_model_1.pkl", "rb"))
-    predictions = model.predict(df_imputed)
+    # Load the model and make predictions
+    model = pickle.load(open("trained_insurance_model.pkl", "rb"))
+    predictions = model.predict(df)
 
     # Convert predictions from 0,1 to 'No', 'Yes'
     predictions_mapped = ['Yes' if pred == 1 else 'No' for pred in predictions]
-   
+    
+    # Create a DataFrame for the predictions
+    predictions_df = pd.DataFrame(predictions_mapped, columns=['Predictions'])
 
-    # Append mapped predictions to the original DataFrame
-    df['Predictions'] = predictions_mapped
-    print("DataFrame with predictions appended:")
-    print(df.head())  # Display first few rows to confirm predictions are appended
-    return df
-   
+    # Combine the predictions with the original DataFrame
+    df_final = df.reset_index(drop=True)
+    df_final['Predictions'] = predictions_df
+
+    return df_final
+
+# Usage:
+# model_filename = "path/to/your/saved/model.pkl"
+# uploaded_file_path = "path/to/your/csv/file.csv"
+# final_df = load_and_predict(uploaded_file_path, model_filename)
+
 
 
 def upload_file(uploaded_file):
